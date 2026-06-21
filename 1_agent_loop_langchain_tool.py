@@ -12,7 +12,8 @@ MODEL = "qwen3:1.7b"
 
 # Define tools
 
-@tool # layer 1
+
+@tool  # layer 1
 # @traceable(run_type="tool") # layer 2 raw function call
 def get_product_price(product: str) -> float:
     """
@@ -22,30 +23,35 @@ def get_product_price(product: str) -> float:
     prices = {"laptop": 1299.99, "headphones": 149.95, "keyboard": 89.50}
     return prices.get(product, 0)
 
-@tool # layer 1
+
+@tool  # layer 1
 # @traceable(run_type="tool") # layer 2 raw function call
 def apply_discount(price: float, discount_tier: str) -> float:
     """
     Apply a discount tier to a price and return the final price
-    
+
     Available tiers are bronze, silver, and gold
     """
-    print(f"    >> Executing apply_discount(price={price}, discount_tier={discount_tier})")
+    print(
+        f"    >> Executing apply_discount(price={price}, discount_tier={discount_tier})"
+    )
     discount_percentages = {"bronze": 5, "silver": 12, "gold": 23}
-    return round(price * (1.0 - discount_percentages.get(discount_tier, 0)/100), 2)
+    return round(price * (1.0 - discount_percentages.get(discount_tier, 0) / 100), 2)
+
 
 # Define agent loop
+
 
 @traceable(name="LangChain Agent Loop")
 def run_agent(question: str):
     tools = [get_product_price, apply_discount]
     tools_dict = {t.name: t for t in tools}
-    
+
     llm = init_chat_model(f"ollama:{MODEL}", temperature=0)
     llm_with_tools = llm.bind_tools(tools)
 
     print(f"Question: {question}")
-    print("="*60)
+    print("=" * 60)
 
     messages = [
         SystemMessage(
@@ -62,20 +68,20 @@ def run_agent(question: str):
                 "Always use the apply_discount tool.\n"
                 "4. If the user does not specify a discount tier, "
                 "ask them which tier to use - do NOT assume one."
-             )
+            )
         ),
-        HumanMessage(content=question)
+        HumanMessage(content=question),
     ]
 
     for iteration in range(1, MAX_ITERATIONS + 1):
         print(f"Iteration: {iteration}")
         ai_message = llm_with_tools.invoke(messages)
         tool_calls = ai_message.tool_calls
-        
+
         if not tool_calls:
             print(f"\nFinal Answer: {ai_message.content}")
             return ai_message.content
-        
+
         # Process the first tool call only
         tool_call = tool_calls[0]
         tool_name = tool_call.get("name")
@@ -87,7 +93,7 @@ def run_agent(question: str):
         tool_to_use = tools_dict.get(tool_name)
         if tool_to_use is None:
             raise ValueError(f"Tool '{tool_name}' is not found")
-        
+
         observation = tool_to_use.invoke(tool_args)
 
         print(f"    [Tool Result] {observation}")
@@ -96,14 +102,12 @@ def run_agent(question: str):
         messages.append(
             ToolMessage(content=str(observation), tool_call_id=tool_call_id)
         )
-    
+
     print("ERROR: Max iterations reached without a final answer")
     return None
+
 
 if __name__ == "__main__":
     print("Hello Langchain Agent (.bind_tools)!")
     print()
     result = run_agent("What is the price of a laptop after applying a gold discount?")
-
-
-
